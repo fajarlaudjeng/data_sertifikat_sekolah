@@ -1,0 +1,62 @@
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('Export JSON')
+    .addItem('Copy JSON ke clipboard', 'copyJSONWithDriveLinks')
+    .addToUi();
+}
+
+// Fungsi untuk ubah Google Drive share link jadi link langsung
+function driveImagePreview(link) {
+  if (!link) return "";
+  const match = link.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (match) {
+    const fileId = match[1];
+    return `https://drive.google.com/uc?export=view&id=${fileId}`;
+  }
+  return link;
+}
+
+function copyJSONWithDriveLinks() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('database');
+  const data = sheet.getDataRange().getValues();
+
+  if (data.length < 2) {
+    SpreadsheetApp.getUi().alert('Tidak ada data.');
+    return;
+  }
+
+  const headers = data[0];
+  const rows = data.slice(1);
+
+  const json = rows.map(row => {
+    const obj = {};
+    headers.forEach((h, i) => {
+      if (h.toLowerCase() === 'gambar') {
+        obj[h] = row[i] 
+          ? row[i].toString().split(',').map(s => s.trim()).map(driveImagePreview) 
+          : [];
+      } else if (h.toLowerCase() === 'latitude' || h.toLowerCase() === 'longitude') {
+        obj[h] = row[i] ? parseFloat(row[i]) : null;
+      } else {
+        obj[h] = row[i] || '';
+      }
+    });
+    return obj;
+  });
+
+  const jsonString = JSON.stringify(json, null, 2);
+
+  // Tampilkan JSON di dialog untuk dicopy
+  const html = `
+    <html>
+      <body>
+        <p>Copy JSON di bawah ini dan paste ke file database.json di GitHub:</p>
+        <textarea id="json" style="width:100%;height:300px;">${jsonString}</textarea>
+        <br><br>
+        <button onclick="document.getElementById('json').select();document.execCommand('copy');alert('JSON berhasil dicopy!');">Copy ke Clipboard</button>
+      </body>
+    </html>
+  `;
+  
+  SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(700).setHeight(450), 'JSON Database');
+}
